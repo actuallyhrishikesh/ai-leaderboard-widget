@@ -27,7 +27,7 @@ The widget comes in four sizes:
 
 What each part of the widget means:
 
-- **Header:** the ranking you picked (for example "AI Leaderboard · Overall"), "open" if you're showing only open-weights models, and the date of the data. If the latest download failed, the date is followed by **(cached)** and the widget shows the last data it saved.
+- **Header:** the ranking you picked (for example "AI Leaderboard · Overall"), "open" if you're showing only open-weights models, your **Show only** filter if you set one, and the date of the data. If the latest download failed, the date is followed by **(cached)** and the widget shows the last data it saved.
 - **Rank number:** the model's position in the ranking you picked. The leader's rank and score are shown in purple.
 - **Coloured dot:** the provider. Anthropic is orange, Google blue, OpenAI green, Meta dark blue, Alibaba amber, Moonshot AI indigo, Zhipu AI teal and xAI grey; others are purple.
 - **Effort badge:** the reasoning effort the model was benchmarked at (for example `max`, `xhigh`, `high`). BenchLeader ranks each model + effort pair separately, so a model can appear more than once.
@@ -37,7 +37,13 @@ What each part of the widget means:
 - **Clicking:** click a row to open that model's page on benchleader.com. Click anywhere else to open the homepage.
 - **Updates:** the widget refreshes every hour, a few minutes after BenchLeader's own hourly update. If a download fails, it tries again in 15 minutes.
 
-**Settings:** right-click the widget → **Edit "AI Leaderboard"** to choose **Rank by** and **Open-weights models only**. Each widget you place has its own settings, so you can keep, say, an Overall widget next to a Coding widget.
+**Settings:** right-click the widget → **Edit "AI Leaderboard"** to choose:
+
+- **Rank by:** which ranking to show.
+- **Open-weights models only:** hides closed models.
+- **Show only:** type a model or provider name, such as `Claude`, `Sonnet` or `OpenAI, Google`, to show only matching models. It uses the same rules as [search in the app](#search). Leave it empty to show everything.
+
+Each widget you place has its own settings. For example, you could keep an Overall widget next to a "Claude" widget ranked by Coding.
 
 ### The companion app
 
@@ -51,6 +57,7 @@ The app shows all 100 rows in a table with the same options as the widget. You n
 
 *With "Open weights only" turned on, only models whose weights are publicly downloadable are shown.*
 
+- **Search** (top right, or press ⌘F): filters the table as you type (see [Search](#search)). "N of 100 match" shows how many rows are left.
 - **Rank by:** picks the ranking (see below). The highlighted column updates to match.
 - **Open weights only:** hides closed models.
 - **Data as of:** the date BenchLeader published the data.
@@ -67,6 +74,21 @@ Table columns:
 | **Index** | The BenchLeader Index with its uncertainty (`±` is roughly a 95% range). Models whose ranges overlap are effectively tied. |
 | **$/M (blended)** | US dollars per million tokens, blended at 3 input tokens : 1 output token |
 | **Speed** | Typical (median) output speed in tokens per second. "—" means it hasn't been measured. |
+
+### Search
+
+The app's search box and the widget's **Show only** setting work the same way:
+
+| You type | You get |
+| --- | --- |
+| `claude` or `anthropic` | Every Anthropic configuration |
+| `sonnet` | Only Claude Sonnet models |
+| `opus 5.5` | Claude Opus 5.5 at every reasoning effort. When you type several words, a model must match all of them. |
+| `openai max` | OpenAI models benchmarked at `max` effort |
+| `anthropic, google` | Anthropic **or** Google models. Commas separate alternatives. |
+| `gpt6` | GPT-6, GPT-6.1, GPT-6.2… Case, spaces and punctuation are ignored. |
+
+A search looks at the model name, provider and reasoning effort. Matching models keep their position in the full ranking, so a search for `claude` shows #1, #3, #7… and you can still see where each one stands overall.
 
 ### Rankings
 

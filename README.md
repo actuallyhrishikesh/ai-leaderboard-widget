@@ -20,7 +20,7 @@ A native macOS desktop / Notification Center widget that shows the current AI mo
 
 ![The AI Leaderboard widget in the macOS widget gallery, in small, medium, large and extra-large sizes](docs/images/widget-gallery.webp)
 
-*The widget gallery (right-click the desktop → Edit Widgets…). The gallery previews use the last saved data, or a short built-in sample before the first download. That's why this one reads "6 ranked".*
+*The widget gallery (right-click the desktop → Edit Widgets…), showing all four sizes with live BenchLeader data. Drag one onto the desktop, then right-click it → Edit "AI Leaderboard" to pick a source.*
 
 The widget comes in four sizes:
 
@@ -59,15 +59,25 @@ Each widget you place has its own settings. For example, you could keep a BenchL
 
 The app shows the full list from each source in a table, with the same options as the widget. You need to open it once after installing so macOS registers the widget.
 
-*The screenshots below show the BenchLeader source. The app now also has a Source switch at the top left, and the date has moved to the footer.*
+![The app showing the BenchLeader source, ranked Overall, with Index, price and speed columns](docs/images/app-benchleader.webp)
 
-![The app's Rank by menu open, with Value selected, showing all models ranked by index points per dollar](docs/images/app-rank-by-menu.webp)
+*BenchLeader, ranked Overall: each model's index with its uncertainty, its blended price per million tokens and its output speed.*
 
-*Ranking by Value: the BenchLeader Index divided by the blended price. Cheaper models that still score well rise to the top.*
+![The app showing the LMArena source, with Arena score, 95% range, votes and licence columns](docs/images/app-lmarena.webp)
 
-![The app filtered to open-weights models only, ranked by Value](docs/images/app-open-weights-value.webp)
+*LMArena: scores from people's blind head-to-head votes, with how many votes each score is based on and the model's licence.*
 
-*With "Open weights only" turned on, only models whose weights are publicly downloadable are shown.*
+![The LMArena Category menu open, listing Overall, Coding, Math, Expert, English, Creative writing, Hard prompts, Instruction following, Multi-turn, Longer queries and Non-English](docs/images/app-lmarena-categories.webp)
+
+*Each source has its own ranking menu. LMArena's Category menu has eleven leaderboards.*
+
+![The app showing the Hugging Face source with the Sort by menu open: Trending, Downloads, Likes](docs/images/app-huggingface-sort.webp)
+
+*Hugging Face: the Hub's trending text-generation models, sortable by trending, downloads in the last 30 days, or likes.*
+
+![A search for "open ai , claude" showing 67 of 100 BenchLeader rows, OpenAI and Anthropic models only, each keeping its overall rank](docs/images/app-search.webp)
+
+*Searching "open ai , claude": the comma means "or", so it shows OpenAI and Claude models (67 of 100). Each keeps its overall rank (#1, #3, #5…).*
 
 - **Source** (top left): BenchLeader, LMArena or Hugging Face.
 - **Search** (top right, or press ⌘F): filters the table as you type (see [Search](#search)). "N of M match" shows how many rows are left.

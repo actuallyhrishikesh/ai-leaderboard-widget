@@ -14,6 +14,8 @@ A native macOS desktop / Notification Center widget that shows the current AI mo
 
 > **Unofficial.** This project isn't affiliated with or endorsed by BenchLeader, LMArena or Hugging Face. It only reads data they publish publicly.
 
+![Animated demo: the app switching between BenchLeader, LMArena and Hugging Face, opening the ranking menus](docs/images/demo.gif)
+
 ## Features
 
 ### The widget

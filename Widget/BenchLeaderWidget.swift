@@ -6,68 +6,111 @@ import AppIntents
 
 struct LeaderboardIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "AI Leaderboard"
-    static let description = IntentDescription("Live AI model standings from BenchLeader.")
+    static let description = IntentDescription("AI model standings from BenchLeader, LMArena or the Hugging Face Hub.")
+
+    @Parameter(title: "Source", default: .benchleader)
+    var source: DataSource
 
     @Parameter(title: "Rank by", default: .index)
     var ranking: Ranking
+
+    @Parameter(title: "Category", default: .overall)
+    var arenaCategory: ArenaCategory
+
+    @Parameter(title: "Sort by", default: .trending)
+    var hubSort: HubSort
 
     @Parameter(title: "Open-weights models only", default: false)
     var openWeightsOnly: Bool
 
     @Parameter(title: "Show only", description: "Model or provider names, e.g. \"Claude\", \"Sonnet\" or \"OpenAI, Google\". Leave empty to show all.")
     var filter: String?
+
+    /// Shows only the options that apply to the chosen source.
+    static var parameterSummary: some ParameterSummary {
+        When(\.$source, .equalTo, DataSource.benchleader) {
+            Summary("\(\.$source) by \(\.$ranking)") {
+                \.$openWeightsOnly
+                \.$filter
+            }
+        } otherwise: {
+            When(\.$source, .equalTo, DataSource.lmarena) {
+                Summary("\(\.$source): \(\.$arenaCategory)") {
+                    \.$openWeightsOnly
+                    \.$filter
+                }
+            } otherwise: {
+                Summary("\(\.$source) by \(\.$hubSort)") {
+                    \.$filter
+                }
+            }
+        }
+    }
+
+    var request: BoardRequest {
+        BoardRequest(source: source, ranking: ranking, arenaCategory: arenaCategory,
+                     hubSort: hubSort, openWeightsOnly: openWeightsOnly)
+    }
 }
 
 // MARK: - Timeline
 
 struct LeaderboardEntry: TimelineEntry {
     let date: Date
-    let file: LeaderboardFile?
-    let ranking: Ranking
+    let board: Board?
+    let source: DataSource
     let openWeightsOnly: Bool
     var filter: String = ""
     let isStale: Bool
 
     var search: ModelSearch { ModelSearch(filter) }
-    var rows: [RankedRow] {
-        (file.map { ranking.rank($0.rows, openWeightsOnly: openWeightsOnly) } ?? []).filtered(by: search)
-    }
+    var rows: [BoardRow] { board?.rows ?? [] }
 }
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> LeaderboardEntry {
-        LeaderboardEntry(date: .now, file: LeaderboardAPI.cached() ?? .sample, ranking: .index, openWeightsOnly: false, isStale: false)
+        let board = LeaderboardAPI.cached().map { BoardLoader.benchleaderBoard($0, BoardRequest()) }
+            ?? BoardLoader.benchleaderBoard(.sample, BoardRequest())
+        return LeaderboardEntry(date: .now, board: board, source: .benchleader, openWeightsOnly: false, isStale: false)
     }
 
     func snapshot(for configuration: LeaderboardIntent, in context: Context) async -> LeaderboardEntry {
-        let file = context.isPreview ? (LeaderboardAPI.cached() ?? .sample) : await load().file
-        return LeaderboardEntry(date: .now, file: file, ranking: configuration.ranking,
-                                openWeightsOnly: configuration.openWeightsOnly,
-                                filter: configuration.filter ?? "", isStale: false)
+        if context.isPreview && configuration.source == .benchleader { return placeholder(in: context) }
+        return await makeEntry(configuration).entry
     }
 
     func timeline(for configuration: LeaderboardIntent, in context: Context) async -> Timeline<LeaderboardEntry> {
-        let (file, fresh) = await load()
-        let entry = LeaderboardEntry(date: .now, file: file, ranking: configuration.ranking,
-                                     openWeightsOnly: configuration.openWeightsOnly,
-                                     filter: configuration.filter ?? "", isStale: !fresh)
-        // BenchLeader rebuilds at :03 past each hour (UTC); ask for a refresh shortly after.
-        // On failure, retry in 15 minutes.
+        let (entry, fresh) = await makeEntry(configuration)
+        // BenchLeader rebuilds at :03 past each hour (UTC); refresh shortly after. On failure, retry in 15 minutes.
         let next = fresh ? Self.nextHourlyRefresh() : Date.now.addingTimeInterval(15 * 60)
         return Timeline(entries: [entry], policy: .after(next))
     }
 
-    private func load() async -> (file: LeaderboardFile?, fresh: Bool) {
-        if let f = try? await LeaderboardAPI.fetch() { return (f, true) }
-        return (LeaderboardAPI.cached(), false)
+    private func makeEntry(_ config: LeaderboardIntent) async -> (entry: LeaderboardEntry, fresh: Bool) {
+        let filter = config.filter ?? ""
+        let search = ModelSearch(filter)
+        var board: Board?
+        var fresh = false
+        if config.source == .huggingface && !search.isEmpty {
+            board = try? await BoardLoader.hubSearch(search, sort: config.hubSort)
+            fresh = board != nil
+        } else {
+            let result = await BoardLoader.load(config.request, needsAllRows: !search.isEmpty)
+            board = result.board?.filtered(by: search)
+            fresh = result.fresh
+        }
+        let entry = LeaderboardEntry(date: .now, board: board, source: config.source,
+                                     openWeightsOnly: config.openWeightsOnly && config.source.supportsOpenWeightsFilter,
+                                     filter: filter, isStale: board != nil && !fresh)
+        return (entry, fresh)
     }
 
     static func nextHourlyRefresh() -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let now = Date.now
-        let comps = DateComponents(minute: 10)
-        return cal.nextDate(after: now, matching: comps, matchingPolicy: .nextTime) ?? now.addingTimeInterval(3600)
+        return cal.nextDate(after: now, matching: DateComponents(minute: 10), matchingPolicy: .nextTime)
+            ?? now.addingTimeInterval(3600)
     }
 }
 
@@ -78,19 +121,19 @@ struct LeaderboardWidgetView: View {
     let entry: LeaderboardEntry
 
     var body: some View {
-        if entry.file == nil {
+        if entry.board == nil {
             VStack(spacing: 6) {
                 Image(systemName: "wifi.exclamationmark").font(.title2)
-                Text("Couldn't reach benchleader.com").font(.caption).multilineTextAlignment(.center)
+                Text("Couldn't reach \(entry.source.shortName)").font(.caption).multilineTextAlignment(.center)
             }
             .foregroundStyle(.secondary)
         } else if entry.rows.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 Header(entry: entry, compact: family == .systemSmall)
                 Spacer()
-                Text("No models match “\(entry.filter)”.")
+                Text(entry.search.isEmpty ? "No models to show." : "No models match “\(entry.filter)”.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("Right-click → Edit to change the filter.")
+                Text("Right-click → Edit to change the settings.")
                     .font(.caption2).foregroundStyle(.tertiary)
                 Spacer()
             }
@@ -110,9 +153,10 @@ private struct Header: View {
     var compact = false
 
     var body: some View {
+        let title = entry.board?.rankingTitle ?? ""
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Image(systemName: "trophy.fill").foregroundStyle(.purple).font(.caption)
-            Text(compact ? entry.ranking.shortTitle : "AI Leaderboard · \(entry.ranking.shortTitle)")
+            Text(compact ? title : "\(entry.source.shortName) · \(title)")
                 .font(.caption.weight(.semibold))
             if entry.openWeightsOnly { Text("open").font(.caption2).foregroundStyle(.secondary) }
             if !entry.search.isEmpty {
@@ -121,7 +165,7 @@ private struct Header: View {
                     .labelStyle(.titleAndIcon)
             }
             Spacer(minLength: 0)
-            if !compact, let asOf = entry.file?.asOf {
+            if !compact, let asOf = entry.board?.asOf {
                 Text(asOf + (entry.isStale ? " (cached)" : ""))
                     .font(.caption2).foregroundStyle(.secondary)
             }
@@ -140,16 +184,15 @@ private struct SmallView: View {
                 HStack(spacing: 5) {
                     Text("\(r.position)").font(.caption2.monospacedDigit().weight(.bold))
                         .foregroundStyle(r.position == 1 ? .purple : .secondary)
-                        .frame(width: 12, alignment: .trailing)
-                    Circle().fill(ProviderStyle.color(r.row.provider)).frame(width: 5, height: 5)
-                    Text(r.row.model).font(.caption2.weight(.medium)).lineLimit(1)
+                        .frame(width: 16, alignment: .trailing)
+                    Circle().fill(ProviderStyle.color(r.provider)).frame(width: 5, height: 5)
+                    Text(r.name).font(.caption2.weight(.medium)).lineLimit(1)
                     Spacer(minLength: 2)
-                    Text(String(format: entry.ranking == .speed ? "%.0f" : "%.1f", r.score))
-                        .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    Text(r.scoreText).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
-            Text("benchleader.com").font(.system(size: 8)).foregroundStyle(.tertiary)
+            Text(entry.source.shortName.lowercased()).font(.system(size: 8)).foregroundStyle(.tertiary)
         }
     }
 }
@@ -168,7 +211,7 @@ private struct ListView: View {
                 ForEach(0..<columns, id: \.self) { c in
                     VStack(spacing: 0) {
                         ForEach(rows.dropFirst(c * perCol).prefix(perCol)) { r in
-                            RowView(r: r, ranking: entry.ranking)
+                            RowView(r: r, fallback: entry.source.homepage)
                             Spacer(minLength: 0)
                         }
                     }
@@ -176,7 +219,7 @@ private struct ListView: View {
                 }
             }
             HStack {
-                Text("Source: BenchLeader (CC BY 4.0)")
+                Text(entry.board?.credit ?? "")
                 Spacer()
                 Text(entry.search.isEmpty ? "\(entry.rows.count) ranked" : "\(entry.rows.count) match")
             }
@@ -186,42 +229,35 @@ private struct ListView: View {
 }
 
 private struct RowView: View {
-    let r: RankedRow
-    let ranking: Ranking
+    let r: BoardRow
+    let fallback: URL
 
     var body: some View {
-        let link = r.row.url.flatMap(URL.init(string:)) ?? LeaderboardAPI.homepage
-        Link(destination: link) {
+        Link(destination: r.url ?? fallback) {
             HStack(spacing: 6) {
                 Text("\(r.position)")
                     .font(.caption.monospacedDigit().weight(.bold))
                     .foregroundStyle(r.position == 1 ? .purple : .secondary)
-                    .frame(width: 18, alignment: .trailing)
-                Circle().fill(ProviderStyle.color(r.row.provider)).frame(width: 6, height: 6)
+                    .frame(width: 22, alignment: .trailing)
+                Circle().fill(ProviderStyle.color(r.provider)).frame(width: 6, height: 6)
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 4) {
-                        Text(r.row.model).font(.caption.weight(.medium)).lineLimit(1)
-                        if let e = r.row.effort, !e.isEmpty {
+                        Text(r.name).font(.caption.weight(.medium)).lineLimit(1)
+                        if let e = r.badge, !e.isEmpty {
                             Text(e).font(.system(size: 9, weight: .medium))
                                 .padding(.horizontal, 4).padding(.vertical, 1)
                                 .background(.quaternary, in: Capsule())
+                                .lineLimit(1)
                         }
                     }
-                    Text(subtitle).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
+                    Text(r.subtitle).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 4)
-                Text(ranking.format(r.score))
+                Text(r.scoreText)
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(r.position == 1 ? .purple : .primary)
             }
         }
-    }
-
-    private var subtitle: String {
-        var parts = [r.row.provider]
-        if let p = r.row.priceBlendedUsdPerMtok { parts.append(String(format: "$%.2f/M", p)) }
-        if ranking != .index, let i = r.row.index { parts.append(String(format: "idx %.1f", i)) }
-        return parts.joined(separator: " · ")
     }
 }
 
@@ -232,10 +268,10 @@ struct BenchLeaderLeaderboardWidget: Widget {
         AppIntentConfiguration(kind: "BenchLeaderLeaderboard", intent: LeaderboardIntent.self, provider: Provider()) { entry in
             LeaderboardWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
-                .widgetURL(LeaderboardAPI.homepage)
+                .widgetURL(entry.source.homepage)
         }
         .configurationDisplayName("AI Leaderboard")
-        .description("AI model standings from benchleader.com, refreshed hourly.")
+        .description("AI model standings from BenchLeader, LMArena or the Hugging Face Hub, refreshed hourly.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }

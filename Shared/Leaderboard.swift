@@ -110,35 +110,73 @@ enum Ranking: String, CaseIterable, AppEnum {
 /// - Commas separate alternatives: a row matches if it matches any of them.
 /// - Within one alternative, every word must match the model name, provider, effort or configuration id.
 /// - Case, accents and punctuation are ignored, so "gpt6" matches "GPT-6" and "opus 5.5" matches "Opus 5.5".
+/// - A word that is only a number (like "4" or "5.5") must match a whole version number:
+///   "llama 4" finds Llama 4 and Llama 4.1, but not Llama 3.1 405B.
 struct ModelSearch {
-    private let alternatives: [[String]]
+    private enum Term {
+        case text(String)    // normalized; matched anywhere
+        case number(String)  // like "4" or "5.5"; matched against version numbers
+    }
+
+    private let alternatives: [[Term]]
+    /// The original words of each comma-separated alternative, for sources that also search on their server.
+    let rawAlternatives: [[String]]
 
     init(_ query: String) {
-        alternatives = query
+        let raw = query
             .split(separator: ",")
-            .map { $0.split(whereSeparator: \.isWhitespace).map { Self.normalize(String($0)) }.filter { !$0.isEmpty } }
+            .map { $0.split(whereSeparator: \.isWhitespace).map(String.init) }
+        rawAlternatives = raw.filter { words in words.contains { !Self.normalize($0).isEmpty } }
+        alternatives = raw
+            .map { words in words.compactMap(Self.term) }
             .filter { !$0.isEmpty }
     }
 
     var isEmpty: Bool { alternatives.isEmpty }
 
-    func matches(_ r: ModelRow) -> Bool {
+    /// `text` is everything searchable about a row (name, provider, effort…). Numbers are only looked for
+    /// in `versionsFrom` (the model's name) when given, so an organisation like "HuggingFaceM4" isn't a "4".
+    func matches(_ text: String, versionsFrom: String? = nil) -> Bool {
         if isEmpty { return true }
-        let haystack = Self.normalize([r.model, r.provider, r.effort ?? "", r.configurationId].joined(separator: " "))
-        return alternatives.contains { words in words.allSatisfy { haystack.contains($0) } }
+        let haystack = Self.normalize(text)
+        let numbers = Self.versionNumbers(in: versionsFrom ?? text)
+        return alternatives.contains { terms in
+            terms.allSatisfy { term in
+                switch term {
+                case .text(let t): haystack.contains(t)
+                case .number(let n): numbers.contains { $0 == n || $0.hasPrefix(n + ".") }
+                }
+            }
+        }
+    }
+
+    private static func term(_ word: String) -> Term? {
+        let trimmed = word.trimmingCharacters(in: CharacterSet(charactersIn: ".-_()"))
+        let isNumber = !trimmed.isEmpty && trimmed.first!.isNumber
+            && trimmed.allSatisfy { $0.isNumber || $0 == "." } && !trimmed.contains("..")
+        if isNumber { return .number(trimmed) }
+        let n = normalize(word)
+        return n.isEmpty ? nil : .text(n)
+    }
+
+    private static let versionPattern = try! NSRegularExpression(pattern: "(?<![a-z\\d.])(\\d+(?:\\.\\d+)*)([a-z]*)")
+
+    /// Version numbers in a name: "Llama-3.1-405B-4bit" → ["3.1"], "GPT-4o" → ["4"].
+    /// Numbers glued to letters are sizes or quantization ("405B", "4bit", "INT4", "Q4_K_M", "FP8") and
+    /// don't count, except a trailing "o" as in GPT-4o. Names like "Qwen3" are still found by typing "qwen3".
+    private static func versionNumbers(in text: String) -> [String] {
+        let s = text.lowercased()
+        let ns = s as NSString
+        return versionPattern.matches(in: s, range: NSRange(location: 0, length: ns.length)).compactMap { m in
+            let suffix = ns.substring(with: m.range(at: 2))
+            return suffix.isEmpty || suffix == "o" ? ns.substring(with: m.range(at: 1)) : nil
+        }
     }
 
     /// Lowercased, accent-free, letters and digits only.
     private static func normalize(_ s: String) -> String {
         let folded = s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
         return String(folded.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
-    }
-}
-
-extension Array where Element == RankedRow {
-    /// Keeps each row's position in the full ranking, so a search for "claude" shows #1, #6, #7…
-    func filtered(by search: ModelSearch) -> [RankedRow] {
-        search.isEmpty ? self : filter { search.matches($0.row) }
     }
 }
 
@@ -189,6 +227,12 @@ enum ProviderStyle {
         case "spacexai", "xai": Color.gray
         case "deepseek": Color.blue
         case "zhipu ai": Color.teal
+        case "mistral": Color(red: 0.98, green: 0.36, blue: 0.13)
+        case "nvidia": Color(red: 0.46, green: 0.73, blue: 0.0)
+        case "microsoft": Color.cyan
+        case "hugging face": Color.yellow
+        case "minimax": Color.pink
+        case "tencent", "bytedance": Color.mint
         default: Color.purple
         }
     }

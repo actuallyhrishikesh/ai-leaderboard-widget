@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/icon.png" width="128" height="128" alt="AI Leaderboard app icon">
+</p>
+
 # AI Leaderboard: a macOS widget
 
 A native macOS desktop / Notification Center widget that shows the current AI model standings from [BenchLeader](https://www.benchleader.com), refreshed every hour.
@@ -108,6 +112,7 @@ Or open `BenchLeader.xcodeproj` in Xcode and run the **BenchLeader** scheme. The
 | `Shared/Leaderboard.swift` | Data model, ranking logic, fetching and on-disk cache (used by both targets) |
 | `Widget/BenchLeaderWidget.swift` | WidgetKit extension: configuration intent, timeline provider, views |
 | `BenchLeader/BenchLeaderApp.swift` | Host app with the full table |
+| `BenchLeader/AppIcon.icon` | App icon in Icon Composer format. macOS 26 applies its own rounded-square outline; Xcode also generates the icon file used by older macOS versions. |
 | `Config/` | Widget `Info.plist` and sandbox entitlements (network client only) |
 
 The widget fetches [`https://www.benchleader.com/data/leaderboard.json`](https://www.benchleader.com/data/leaderboard.json), the top 100 model configurations on the BenchLeader Index. A configuration is one model at one reasoning effort. Rankings other than Overall re-sort those 100 rows, so they aren't BenchLeader's full category leaderboards.

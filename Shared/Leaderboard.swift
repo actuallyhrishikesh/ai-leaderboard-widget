@@ -103,6 +103,45 @@ enum Ranking: String, CaseIterable, AppEnum {
     }
 }
 
+// MARK: - Search
+
+/// Matches rows against a search like "claude", "sonnet 5.5", "OpenAI max" or "anthropic, google".
+///
+/// - Commas separate alternatives: a row matches if it matches any of them.
+/// - Within one alternative, every word must match the model name, provider, effort or configuration id.
+/// - Case, accents and punctuation are ignored, so "gpt6" matches "GPT-6" and "opus 5.5" matches "Opus 5.5".
+struct ModelSearch {
+    private let alternatives: [[String]]
+
+    init(_ query: String) {
+        alternatives = query
+            .split(separator: ",")
+            .map { $0.split(whereSeparator: \.isWhitespace).map { Self.normalize(String($0)) }.filter { !$0.isEmpty } }
+            .filter { !$0.isEmpty }
+    }
+
+    var isEmpty: Bool { alternatives.isEmpty }
+
+    func matches(_ r: ModelRow) -> Bool {
+        if isEmpty { return true }
+        let haystack = Self.normalize([r.model, r.provider, r.effort ?? "", r.configurationId].joined(separator: " "))
+        return alternatives.contains { words in words.allSatisfy { haystack.contains($0) } }
+    }
+
+    /// Lowercased, accent-free, letters and digits only.
+    private static func normalize(_ s: String) -> String {
+        let folded = s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        return String(folded.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
+    }
+}
+
+extension Array where Element == RankedRow {
+    /// Keeps each row's position in the full ranking, so a search for "claude" shows #1, #6, #7…
+    func filtered(by search: ModelSearch) -> [RankedRow] {
+        search.isEmpty ? self : filter { search.matches($0.row) }
+    }
+}
+
 // MARK: - Fetching
 
 enum LeaderboardAPI {

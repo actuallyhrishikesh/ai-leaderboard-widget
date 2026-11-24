@@ -14,11 +14,14 @@ struct ContentView: View {
     @State private var file: LeaderboardFile? = LeaderboardAPI.cached()
     @State private var ranking: Ranking = .index
     @State private var openOnly = false
+    @State private var query = ""
     @State private var error: String?
     @State private var loading = false
 
     var body: some View {
-        let rows = file.map { ranking.rank($0.rows, openWeightsOnly: openOnly) } ?? []
+        let ranked = file.map { ranking.rank($0.rows, openWeightsOnly: openOnly) } ?? []
+        let search = ModelSearch(query)
+        let rows = ranked.filtered(by: search)
         VStack(spacing: 0) {
             HStack {
                 Picker("Rank by", selection: $ranking) {
@@ -26,6 +29,9 @@ struct ContentView: View {
                 }
                 .frame(width: 220)
                 Toggle("Open weights only", isOn: $openOnly)
+                if !search.isEmpty {
+                    Text("\(rows.count) of \(ranked.count) match").foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let f = file { Text("Data as of \(f.asOf)").foregroundStyle(.secondary) }
                 if loading { ProgressView().controlSize(.small) }
@@ -50,6 +56,11 @@ struct ContentView: View {
                 TableColumn("$/M (blended)") { Text($0.row.priceBlendedUsdPerMtok.map { String(format: "$%.2f", $0) } ?? "—").monospacedDigit() }.width(95)
                 TableColumn("Speed") { Text($0.row.outputTokensPerSecond.map { String(format: "%.0f t/s", $0) } ?? "—").monospacedDigit() }.width(70)
             }
+            .overlay {
+                if rows.isEmpty && !search.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                }
+            }
 
             HStack {
                 Text("To add the widget: right-click the desktop → Edit Widgets… → search “AI Leaderboard”.")
@@ -58,6 +69,7 @@ struct ContentView: View {
             }
             .font(.caption).foregroundStyle(.secondary).padding(10)
         }
+        .searchable(text: $query, placement: .toolbar, prompt: "Model or provider, e.g. Claude, OpenAI")
         .task { await load() }
     }
 

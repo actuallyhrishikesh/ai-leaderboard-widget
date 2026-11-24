@@ -13,6 +13,9 @@ struct LeaderboardIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Open-weights models only", default: false)
     var openWeightsOnly: Bool
+
+    @Parameter(title: "Show only", description: "Model or provider names, e.g. \"Claude\", \"Sonnet\" or \"OpenAI, Google\". Leave empty to show all.")
+    var filter: String?
 }
 
 // MARK: - Timeline
@@ -22,9 +25,13 @@ struct LeaderboardEntry: TimelineEntry {
     let file: LeaderboardFile?
     let ranking: Ranking
     let openWeightsOnly: Bool
+    var filter: String = ""
     let isStale: Bool
 
-    var rows: [RankedRow] { file.map { ranking.rank($0.rows, openWeightsOnly: openWeightsOnly) } ?? [] }
+    var search: ModelSearch { ModelSearch(filter) }
+    var rows: [RankedRow] {
+        (file.map { ranking.rank($0.rows, openWeightsOnly: openWeightsOnly) } ?? []).filtered(by: search)
+    }
 }
 
 struct Provider: AppIntentTimelineProvider {
@@ -35,13 +42,15 @@ struct Provider: AppIntentTimelineProvider {
     func snapshot(for configuration: LeaderboardIntent, in context: Context) async -> LeaderboardEntry {
         let file = context.isPreview ? (LeaderboardAPI.cached() ?? .sample) : await load().file
         return LeaderboardEntry(date: .now, file: file, ranking: configuration.ranking,
-                                openWeightsOnly: configuration.openWeightsOnly, isStale: false)
+                                openWeightsOnly: configuration.openWeightsOnly,
+                                filter: configuration.filter ?? "", isStale: false)
     }
 
     func timeline(for configuration: LeaderboardIntent, in context: Context) async -> Timeline<LeaderboardEntry> {
         let (file, fresh) = await load()
         let entry = LeaderboardEntry(date: .now, file: file, ranking: configuration.ranking,
-                                     openWeightsOnly: configuration.openWeightsOnly, isStale: !fresh)
+                                     openWeightsOnly: configuration.openWeightsOnly,
+                                     filter: configuration.filter ?? "", isStale: !fresh)
         // BenchLeader rebuilds at :03 past each hour (UTC); ask for a refresh shortly after.
         // On failure, retry in 15 minutes.
         let next = fresh ? Self.nextHourlyRefresh() : Date.now.addingTimeInterval(15 * 60)
@@ -75,6 +84,16 @@ struct LeaderboardWidgetView: View {
                 Text("Couldn't reach benchleader.com").font(.caption).multilineTextAlignment(.center)
             }
             .foregroundStyle(.secondary)
+        } else if entry.rows.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Header(entry: entry, compact: family == .systemSmall)
+                Spacer()
+                Text("No models match “\(entry.filter)”.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Right-click → Edit to change the filter.")
+                    .font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+            }
         } else {
             switch family {
             case .systemSmall: SmallView(entry: entry)
@@ -96,6 +115,11 @@ private struct Header: View {
             Text(compact ? entry.ranking.shortTitle : "AI Leaderboard · \(entry.ranking.shortTitle)")
                 .font(.caption.weight(.semibold))
             if entry.openWeightsOnly { Text("open").font(.caption2).foregroundStyle(.secondary) }
+            if !entry.search.isEmpty {
+                Label(entry.filter.trimmingCharacters(in: .whitespaces), systemImage: "line.3.horizontal.decrease")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .labelStyle(.titleAndIcon)
+            }
             Spacer(minLength: 0)
             if !compact, let asOf = entry.file?.asOf {
                 Text(asOf + (entry.isStale ? " (cached)" : ""))
@@ -154,7 +178,7 @@ private struct ListView: View {
             HStack {
                 Text("Source: BenchLeader (CC BY 4.0)")
                 Spacer()
-                Text("\(entry.rows.count) ranked")
+                Text(entry.search.isEmpty ? "\(entry.rows.count) ranked" : "\(entry.rows.count) match")
             }
             .font(.system(size: 9)).foregroundStyle(.tertiary)
         }

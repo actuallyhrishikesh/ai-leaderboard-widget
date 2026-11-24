@@ -6,11 +6,74 @@ A native macOS desktop / Notification Center widget that shows the current AI mo
 
 ## Features
 
-- **Four sizes:** small (top 4), medium (top 5), large (top 12), extra-large (top 24 in two columns).
-- **Choose the ranking:** Overall (BenchLeader Index), Coding, Agents, Reasoning, Math, Knowledge, Speed (tokens/s) or Value (index per dollar). You can also show open-weights models only.
-- Each row shows the rank, provider, model name, reasoning effort, blended price per million tokens and score. Click a row to open that model's page.
-- Refreshes hourly, shortly after BenchLeader's own hourly rebuild. If it can't connect, it shows the last saved data marked "(cached)".
-- A small companion app shows all 100 rows in a table.
+### The widget
+
+![The AI Leaderboard widget in the macOS widget gallery, in small, medium, large and extra-large sizes](docs/images/widget-gallery.webp)
+
+*The widget gallery (right-click the desktop → Edit Widgets…). The gallery previews use the last saved data, or a short built-in sample before the first download. That's why this one reads "6 ranked".*
+
+The widget comes in four sizes:
+
+| Size | Shows |
+| --- | --- |
+| Small | Top 4: rank, provider dot, model name, score |
+| Medium | Top 5 with provider, price and reasoning effort |
+| Large | Top 12 |
+| Extra-large | Top 24, in two columns |
+
+What each part of the widget means:
+
+- **Header:** the ranking you picked (for example "AI Leaderboard · Overall"), "open" if you're showing only open-weights models, and the date of the data. If the latest download failed, the date is followed by **(cached)** and the widget shows the last data it saved.
+- **Rank number:** the model's position in the ranking you picked. The leader's rank and score are shown in purple.
+- **Coloured dot:** the provider. Anthropic is orange, Google blue, OpenAI green, Meta dark blue, Alibaba amber, Moonshot AI indigo, Zhipu AI teal and xAI grey; others are purple.
+- **Effort badge:** the reasoning effort the model was benchmarked at (for example `max`, `xhigh`, `high`). BenchLeader ranks each model + effort pair separately, so a model can appear more than once.
+- **Second line:** the provider and the blended price per million tokens. When you rank by anything other than Overall, it also shows the model's overall index (`idx`).
+- **Score (right):** the value for the ranking you picked (see [Rankings](#rankings)).
+- **Footer:** the data credit ("Source: BenchLeader (CC BY 4.0)") and how many models match your settings.
+- **Clicking:** click a row to open that model's page on benchleader.com. Click anywhere else to open the homepage.
+- **Updates:** the widget refreshes every hour, a few minutes after BenchLeader's own hourly update. If a download fails, it tries again in 15 minutes.
+
+**Settings:** right-click the widget → **Edit "AI Leaderboard"** to choose **Rank by** and **Open-weights models only**. Each widget you place has its own settings, so you can keep, say, an Overall widget next to a Coding widget.
+
+### The companion app
+
+The app shows all 100 rows in a table with the same options as the widget. You need to open it once after installing so macOS registers the widget.
+
+![The app's Rank by menu open, with Value selected, showing all models ranked by index points per dollar](docs/images/app-rank-by-menu.webp)
+
+*Ranking by Value: the BenchLeader Index divided by the blended price. Cheaper models that still score well rise to the top.*
+
+![The app filtered to open-weights models only, ranked by Value](docs/images/app-open-weights-value.webp)
+
+*With "Open weights only" turned on, only models whose weights are publicly downloadable are shown.*
+
+- **Rank by:** picks the ranking (see below). The highlighted column updates to match.
+- **Open weights only:** hides closed models.
+- **Data as of:** the date BenchLeader published the data.
+- **Refresh:** downloads the latest data and also tells every placed widget to update straight away.
+
+Table columns:
+
+| Column | Meaning |
+| --- | --- |
+| **#** | Position in the ranking you picked |
+| **Model** | Model name, provider dot and reasoning effort. "not stated" means the benchmark sources didn't report the effort setting. |
+| **Provider** | The lab that makes the model |
+| **(Ranking column)** | The score being ranked on. Its title changes with **Rank by**. |
+| **Index** | The BenchLeader Index with its uncertainty (`±` is roughly a 95% range). Models whose ranges overlap are effectively tied. |
+| **$/M (blended)** | US dollars per million tokens, blended at 3 input tokens : 1 output token |
+| **Speed** | Typical (median) output speed in tokens per second. "—" means it hasn't been measured. |
+
+### Rankings
+
+| Ranking | What it sorts by |
+| --- | --- |
+| **Overall** | BenchLeader's own rank on the BenchLeader Index, which combines results from many benchmarks. 50 is the average model; every 15 points is one standard deviation. |
+| **Coding, Agents, Reasoning, Math, Knowledge** | BenchLeader's score for that category, on the same scale as the index. Models without enough results in a category are left out of that ranking. |
+| **Speed** | Typical (median) output speed in tokens per second |
+| **Value** | Index points per dollar: the index divided by the blended price per million tokens |
+
+All rankings use the same 100 rows from BenchLeader's data file. Every ranking except Overall is worked out by this app, not by BenchLeader. Ties are broken by overall rank.
 
 ## Install (prebuilt)
 

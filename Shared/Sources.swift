@@ -1,19 +1,10 @@
 import Foundation
-import AppIntents
 
 // MARK: - Data sources
 
-enum DataSource: String, CaseIterable, AppEnum {
+// Plain enums on purpose, like Ranking: see Widget/WidgetSettings.swift.
+enum DataSource: String, CaseIterable {
     case benchleader, lmarena, huggingface
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Data source" }
-    static var caseDisplayRepresentations: [DataSource: DisplayRepresentation] {
-        [
-            .benchleader: "BenchLeader (benchmarks)",
-            .lmarena: "LMArena (people's votes)",
-            .huggingface: "Hugging Face Hub (popularity)",
-        ]
-    }
 
     var shortName: String {
         switch self {
@@ -36,7 +27,7 @@ enum DataSource: String, CaseIterable, AppEnum {
 }
 
 /// LMArena text-leaderboard categories (a subset of what the dataset publishes).
-enum ArenaCategory: String, CaseIterable, AppEnum {
+enum ArenaCategory: String, CaseIterable {
     case overall, coding, math, expert, english
     case creativeWriting = "creative_writing"
     case hardPrompts = "hard_prompts"
@@ -44,16 +35,6 @@ enum ArenaCategory: String, CaseIterable, AppEnum {
     case multiTurn = "multi_turn"
     case longerQuery = "longer_query"
     case nonEnglish = "non_english"
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Arena category" }
-    static var caseDisplayRepresentations: [ArenaCategory: DisplayRepresentation] {
-        [
-            .overall: "Overall", .coding: "Coding", .math: "Math", .expert: "Expert", .english: "English",
-            .creativeWriting: "Creative writing", .hardPrompts: "Hard prompts",
-            .instructionFollowing: "Instruction following", .multiTurn: "Multi-turn",
-            .longerQuery: "Longer queries", .nonEnglish: "Non-English",
-        ]
-    }
 
     var shortTitle: String {
         switch self {
@@ -73,14 +54,9 @@ enum ArenaCategory: String, CaseIterable, AppEnum {
 }
 
 /// How Hugging Face Hub models are ordered.
-enum HubSort: String, CaseIterable, AppEnum {
+enum HubSort: String, CaseIterable {
     case trending = "trendingScore"
     case downloads, likes
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Hub sort" }
-    static var caseDisplayRepresentations: [HubSort: DisplayRepresentation] {
-        [.trending: "Trending", .downloads: "Downloads (last 30 days)", .likes: "Likes"]
-    }
 
     var shortTitle: String {
         switch self {

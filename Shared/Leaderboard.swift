@@ -1,5 +1,4 @@
 import Foundation
-import AppIntents
 import SwiftUI
 
 // MARK: - Data model (mirrors https://www.benchleader.com/data/leaderboard.json)
@@ -41,22 +40,10 @@ struct RankedRow: Hashable, Identifiable {
 
 // MARK: - Rankings
 
-enum Ranking: String, CaseIterable, AppEnum {
+// Plain enum on purpose: the widget's menus use these names as String settings (Widget/WidgetSettings.swift)
+// rather than AppEnum, which macOS can't load for apps without an Apple Developer Team ID.
+enum Ranking: String, CaseIterable {
     case index, coding, agentic, reasoning, math, knowledge, speed, value
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Ranking" }
-    static var caseDisplayRepresentations: [Ranking: DisplayRepresentation] {
-        [
-            .index: "Overall (BenchLeader Index)",
-            .coding: "Coding",
-            .agentic: "Agents",
-            .reasoning: "Reasoning",
-            .math: "Math",
-            .knowledge: "Knowledge",
-            .speed: "Speed (tokens/s)",
-            .value: "Value (index per $)",
-        ]
-    }
 
     var shortTitle: String {
         switch self {

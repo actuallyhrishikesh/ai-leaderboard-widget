@@ -8,17 +8,18 @@ struct LeaderboardIntent: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "AI Leaderboard"
     static let description = IntentDescription("AI model standings from BenchLeader, LMArena or the Hugging Face Hub.")
 
-    @Parameter(title: "Source", default: .benchleader)
-    var source: DataSource
+    // Menus are String settings with widget-supplied choices; see Widget/WidgetSettings.swift for why.
+    @Parameter(title: "Source", optionsProvider: SourceOptions())
+    var sourceName: String?
 
-    @Parameter(title: "Rank by", default: .index)
-    var ranking: Ranking
+    @Parameter(title: "Rank by", optionsProvider: RankingOptions())
+    var rankingName: String?
 
-    @Parameter(title: "Category", default: .overall)
-    var arenaCategory: ArenaCategory
+    @Parameter(title: "Category", optionsProvider: ArenaCategoryOptions())
+    var arenaCategoryName: String?
 
-    @Parameter(title: "Sort by", default: .trending)
-    var hubSort: HubSort
+    @Parameter(title: "Sort by", optionsProvider: HubSortOptions())
+    var hubSortName: String?
 
     @Parameter(title: "Open-weights models only", default: false)
     var openWeightsOnly: Bool
@@ -28,24 +29,29 @@ struct LeaderboardIntent: WidgetConfigurationIntent {
 
     /// Shows only the options that apply to the chosen source.
     static var parameterSummary: some ParameterSummary {
-        When(\.$source, .equalTo, DataSource.benchleader) {
-            Summary("\(\.$source) by \(\.$ranking)") {
+        When(\.$sourceName, .equalTo, "LMArena") {
+            Summary("\(\.$sourceName): \(\.$arenaCategoryName)") {
                 \.$openWeightsOnly
                 \.$filter
             }
         } otherwise: {
-            When(\.$source, .equalTo, DataSource.lmarena) {
-                Summary("\(\.$source): \(\.$arenaCategory)") {
-                    \.$openWeightsOnly
+            When(\.$sourceName, .equalTo, "Hugging Face") {
+                Summary("\(\.$sourceName) by \(\.$hubSortName)") {
                     \.$filter
                 }
             } otherwise: {
-                Summary("\(\.$source) by \(\.$hubSort)") {
+                Summary("\(\.$sourceName) by \(\.$rankingName)") {
+                    \.$openWeightsOnly
                     \.$filter
                 }
             }
         }
     }
+
+    var source: DataSource { .named(sourceName, fallback: .benchleader) }
+    var ranking: Ranking { .named(rankingName, fallback: .index) }
+    var arenaCategory: ArenaCategory { .named(arenaCategoryName, fallback: .overall) }
+    var hubSort: HubSort { .named(hubSortName, fallback: .trending) }
 
     var request: BoardRequest {
         BoardRequest(source: source, ranking: ranking, arenaCategory: arenaCategory,

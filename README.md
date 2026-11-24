@@ -48,7 +48,7 @@ What each part of the widget means:
 
 **Settings:** right-click the widget → **Edit "AI Leaderboard"** to choose:
 
-- **Source:** BenchLeader, LMArena or Hugging Face Hub. The options below change to match.
+- **Source:** BenchLeader, LMArena or Hugging Face. The options below change to match. Until you pick something, a menu shows **Choose** and the widget uses its default (BenchLeader, Overall, Trending).
 - **Rank by** (BenchLeader), **Category** (LMArena) or **Sort by** (Hugging Face): which ranking to show.
 - **Open-weights models only** (BenchLeader and LMArena): hides closed models. Every Hugging Face model is already open.
 - **Show only:** type a model or provider name, such as `Claude`, `Sonnet` or `OpenAI, Google`, to show only matching models. It uses the same rules as [search in the app](#search). Leave it empty to show everything.
@@ -150,6 +150,24 @@ The Hugging Face list covers text-generation models only. Some well-known models
 
 To change the ranking, right-click the widget → **Edit "AI Leaderboard"**.
 
+### Troubleshooting
+
+**After upgrading, the widget is blank, stuck loading, or ignores its settings.** macOS can keep running the old version's widget in the background. Restart it:
+
+```bash
+killall BenchLeaderWidget
+```
+
+macOS starts the new version automatically. If that's not enough, remove the widget and add it again, or log out and back in.
+
+**Upgrading from 1.3.0 or earlier: the Source / Rank by / Category / Sort by menus are reset.** These menus were rebuilt in 1.3.1 (in earlier versions they never actually reached the widget, so it always showed BenchLeader / Overall). Pick your choices again under **Edit "AI Leaderboard"**.
+
+**Building from source: "Bundle version did not match" in the logs, or the widget stays grey.** Xcode registers every build it makes, so macOS can end up with two copies of the app under the same ID. Unregister the build-folder copy and keep only the installed one:
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u build/Build/Products/Release/BenchLeader.app
+```
+
 ## Build from source
 
 Requirements: macOS 14 or later and Xcode 16 or later. You don't need an Apple Developer account.
@@ -171,6 +189,7 @@ Or open `BenchLeader.xcodeproj` in Xcode and run the **BenchLeader** scheme. The
 | `Shared/Leaderboard.swift` | BenchLeader data model, rankings and fetching; search matching; provider colours |
 | `Shared/Sources.swift` | The source switch, LMArena and Hugging Face fetching, and the common list format the app and widget display |
 | `Widget/BenchLeaderWidget.swift` | WidgetKit extension: configuration (with per-source options), timeline provider, views |
+| `Widget/WidgetSettings.swift` | The choices for the widget's menus. They're plain text settings rather than App Intents enums (`AppEnum`), because macOS only loads `AppEnum` types for apps signed with an Apple Developer Team ID, and this app is signed to run locally. |
 | `BenchLeader/BenchLeaderApp.swift` | Host app with the full table |
 | `BenchLeader/AppIcon.icon` | App icon in Icon Composer format. macOS 26 applies its own rounded-square outline; Xcode also generates the icon file used by older macOS versions. |
 | `Config/` | Widget `Info.plist` and sandbox entitlements (network client only) |
